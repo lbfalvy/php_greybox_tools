@@ -2,8 +2,8 @@
 
 use function timing\write_header;
 
-require_once __dir__.'/debug.php';
-require_once __dir__.'/timing.php';
+require_once __dir__.'/greybox/debug.php';
+require_once __dir__.'/greybox/timing.php';
 $first_timer = \timing\start("my_timer");
 usleep(1000 * 30);
 $first_timer();
