@@ -40,10 +40,12 @@ MSG;
             
     /**
      * Returns whether a given logging category is enabled
+     * @param ?string $category
      */
     function category_enabled($category)
     {
         global $selected_categories, $categories_included;
+        if ($category == null) return !$categories_included;
         return $selected_categories->includes($category) == $categories_included;
     }
     
@@ -69,10 +71,8 @@ MSG;
         global $start_ts;
         $msg_string = "";
         $header_name = "X-Debug";
-        if ($category != null) {
-            if (!category_enabled($category)) return;
-            $msg_string .= "[$category] ";
-        }
+        if (!category_enabled($category)) return;
+        if ($category != null) $msg_string .= "[$category] ";
         if ($list != null) $header_name .= "-$list";
         $delta = monotonic_time() - $start_ts;
         $msg_string .= "T+" . format_bignum($delta, 0) . "ms ";

@@ -26,6 +26,6 @@ usleep(1000 * 50);
 </body>
 </html>
 <?php
-\timing\moment('output_preflush');
+\timing\milestone('output_preflush', null, "This one has a description!");
 usleep(1000*40);
 \timing\write_header();

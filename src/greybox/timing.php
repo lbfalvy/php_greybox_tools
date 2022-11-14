@@ -4,7 +4,7 @@
     require_once __DIR__."/debug.php";
     
     /** Map of names to running timers
-     * [ string => [
+     * @var [ string => [
      *      'start' => int,
      *      'category' => ?string,
      *      'description' => ?string
@@ -24,18 +24,21 @@
     $finished = array();
 
     /**
-     * Indicate that some work has started. Expect the logged times to differ from the measured duration
-     * by a few microseconds, since `debug` calls `monotonic_time` a few lines later.
+     * Indicate that some work has started. Expect the logged times to differ from the measured
+     * duration by a few microseconds, since `debug` calls `monotonic_time` a few lines later.
      * 
-     * @param string $name must not contain spaces, should be unique. Non-unique names are matched via a
-     * stack
+     * @param string $name must not contain spaces, should be unique.
+     * Non-unique names are matched via a stack
      * @param string $category the logging category
      * @param string $desc description
      * @return - a function that stops the timer
      */
     function start($name, $category = null, $desc = null) {
         global $timers;
-        if (key_exists($name, $timers)) throw new \Error("A timer called $name is already running");
+        if (key_exists($name, $timers)) {
+            \debug\log("ERROR: A timer called $name is already running");
+            return function() {};
+        }
         $timers[$name] = [
             'start' => monotonic_time(),
             'category' => $category,
@@ -51,25 +54,54 @@
      */
     function end($name) {
         global $finished, $timers;
-        if (!key_exists($name, $timers)) throw new \Error("No timer called $name is currently running");
+        if (!key_exists($name, $timers)) {
+            \debug\log("ERROR: No timer called $name is currently running");
+            return;
+        }
         $record = $timers[$name];
         unset($timers[$name]);
         $duration = monotonic_time() - $record['start'];
         $record['name'] = $name;
         $record['duration'] = $duration;
-        \debug\log("Ended timer $name after ${duration}ms", $record['category']);
+        $duration_str = format_bignum($duration, 0);
+        \debug\log("Ended timer $name after ${duration_str}ms", $record['category']);
         array_push($finished, $record);
         write_header();
     }
 
-    function moment($name, $category = null, $desc = null) {
+    /** Records a zero-length duration, a moment in time.
+     * @param string $name must not contain spaces, should be unique.
+     * Non-unique names are matched via a stack
+     * @param string $category the logging category
+     * @param string $desc description
+     */
+    function milestone($name, $category = null, $desc = null) {
         global $finished;
         array_push($finished, [
             'name' => $name, 'category' => $category, 'description' => $desc,
             'start' => monotonic_time(), 'duration' => 0
         ]);
-        \debug\log("Point reached $name: $desc");
+        if ($desc != null) $desc_str = ": $desc";
+        \debug\log("Milestone $name reached". $desc_str);
         write_header();
+    }
+
+    /** End the (only) previous timer and start a new one. Fails if there is more than one timer
+     * @param string $name must not contain spaces, should be unique.
+     * Non-unique names are matched via a stack
+     * @param string $category the logging category
+     * @param string $desc description
+     * @return - a function that stops the timer
+     */
+    function start_single($name, $category = null, $desc = null) {
+        global $timers;
+        $names = array_keys($timers);
+        if (count($names) > 1) {
+            \debug\log("ERROR: More than one timer when starting single $name");
+            return;
+        }
+        if (count($names) == 1) end($names[0]);
+        return start($name, $category, $desc);
     }
 
     /**
@@ -82,6 +114,7 @@
         $enabled_records = array_filter($finished, function ($record) {
             return \debug\category_enabled($record['category']);
         });
+        if (empty($enabled_records)) return;
         $record_strings = array_map(function ($record) use ($write_time) {
             global $cumulative;
             [
