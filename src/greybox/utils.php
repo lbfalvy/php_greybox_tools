@@ -1,7 +1,6 @@
 <?php
 
-/**
- * Inserts underscores into bignum to make it more readable.
+/** Inserts underscores into bignum to make it more readable.
  * @param float $num
  */
 function format_bignum($num, $precision = -1)
@@ -35,9 +34,7 @@ function format_bignum($num, $precision = -1)
     return $out;
 }
 
-/**
- * Returns the current time in milliseconds
- * 
+/** Returns the current time in milliseconds.
  * Use this instead of hrtime or microtime
  * @return float
  */
@@ -49,7 +46,17 @@ function monotonic_time() {
     }
 }
 
-/**
- * @var int monotonic_time at the start of script execution
+/** monotonic_time at the start of script execution
+ * @var int 
  */
 $start_ts = monotonic_time();
+
+/** Return the first entry from an array that matches some criterion
+ * @param array $array
+ * @param callback $callback
+ * @return mixed
+ */
+function array_find($array, $callback) {
+    foreach ($array as $value) if ($callback($value)) return $value;
+    return null;
+}

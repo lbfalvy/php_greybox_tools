@@ -1,9 +1,10 @@
 <?php
 
-use function timing\write_header;
-
 require_once __dir__.'/greybox/debug.php';
 require_once __dir__.'/greybox/timing.php';
+
+\timing\extend_header();
+
 $first_timer = \timing\start("my_timer");
 usleep(1000 * 30);
 $first_timer();
@@ -12,6 +13,8 @@ usleep(1000 * 100);
 \timing\end('my_other_timer');
 ob_start();
 usleep(1000 * 50);
+
+header("Server-Timing: noise;dur=1999");
 ?>
 <!DOCTYPE html>
 <html lang="en">

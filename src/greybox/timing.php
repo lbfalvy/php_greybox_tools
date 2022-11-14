@@ -2,6 +2,15 @@
 
     require_once __DIR__."/utils.php";
     require_once __DIR__."/debug.php";
+    require_once __DIR__."/polyfills.php";
+
+    /**
+     * Indicates whether we're sharing the Server-Timing header with some other
+     * author
+     */
+    $extend_header = false;
+    /** Prevents changing to cooperative mode after the header's been overwritten */
+    $header_written = false;
     
     /** Map of names to running timers
      * @var [ string => [
@@ -53,7 +62,7 @@
      * @param string $name must match a start_milestone call
      */
     function end($name) {
-        global $finished, $timers;
+        global $finished, $timers, $extend_header;
         if (!key_exists($name, $timers)) {
             \debug\log("ERROR: No timer called $name is currently running");
             return;
@@ -66,7 +75,7 @@
         $duration_str = format_bignum($duration, 0);
         \debug\log("Ended timer $name after ${duration_str}ms", $record['category']);
         array_push($finished, $record);
-        write_header();
+        if (!$extend_header) write_header();
     }
 
     /** Records a zero-length duration, a moment in time.
@@ -76,14 +85,14 @@
      * @param string $desc description
      */
     function milestone($name, $category = null, $desc = null) {
-        global $finished;
+        global $finished, $extend_header;
         array_push($finished, [
             'name' => $name, 'category' => $category, 'description' => $desc,
             'start' => monotonic_time(), 'duration' => 0
         ]);
         if ($desc != null) $desc_str = ": $desc";
         \debug\log("Milestone $name reached". $desc_str);
-        write_header();
+        if (!$extend_header) write_header();
     }
 
     /** End the (only) previous timer and start a new one. Fails if there is more than one timer
@@ -109,7 +118,8 @@
      * If you can, call this at the last point you have access to
      */
     function write_header() {
-        global $finished, $start_ts;
+        global $finished, $start_ts, $extend_header, $header_written;
+        $header_written = true;
         $write_time = monotonic_time();
         $enabled_records = array_filter($finished, function ($record) {
             return \debug\category_enabled($record['category']);
@@ -130,7 +140,30 @@
         $total_time = $write_time - $start_ts;
         array_unshift($record_strings, "total;dur=$total_time");
         $header_value = join(", ", $record_strings);
+        if ($extend_header) {
+            $header = array_find(headers_list(), function($h) {
+                return str_starts_with($h, "Server-Timing");
+            });
+            if ($header != null) {
+                header("$header, $header_value");
+                return;
+            }
+        }
         header("Server-Timing: $header_value");
+    }
+
+    /**
+     * Call this function upon initialization if you have other systems writing to Server-Timing.
+     * You must call `write_header` once manually at the end, it will close all timers and
+     * append the content of the header to any existing value.
+     */
+    function extend_header() {
+        global $extend_header, $header_written;
+        if ($header_written) {
+            \debug\log("ERROR: \\timing\\extend_header called after Server-Timing had been written");
+            return;
+        }
+        $extend_header = true;
     }
     
     if (key_exists('timing_cumulative', $_COOKIE)) {
