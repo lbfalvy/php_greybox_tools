@@ -1,0 +1,2 @@
+#!/bin/bash
+docker run -p 80:80 -v $PWD/src:/var/www/html --rm -it $(docker build -q .)
